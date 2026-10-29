@@ -9,6 +9,8 @@
 | test | `baml test` | any test fails |
 | codequality | `baml codequality` | never; it only reports |
 
+`codequality` needs a toolchain from 2026-10-28 or later (a nightly, until the next release) and is skipped with a warning on older ones; `fmt` needs one with `baml fmt --check` and fails without it.
+
 Every enabled step runs even if an earlier one fails, so one run shows every problem. The job summary lists each step's result and the code quality report.
 
 ## Usage

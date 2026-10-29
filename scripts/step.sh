@@ -106,6 +106,12 @@ post_comment() {
 run_codequality() {
   local summary="$work/codequality.md"
 
+  # Report-only, so an older toolchain skips it instead of failing the job.
+  if ! baml codequality --help >/dev/null 2>&1; then
+    echo "::warning::baml codequality is not available in BAML $(baml --version 2>/dev/null); use a newer toolchain or set codequality: false"
+    return 0
+  fi
+
   if [[ -z "${PR_NUMBER:-}" ]]; then
     local table="$work/codequality.txt"
     baml "${flags[@]}" --project "$project" codequality | tee "$table"

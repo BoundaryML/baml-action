@@ -50,9 +50,9 @@ jobs:
         id: baml
         uses: ./
         with:
-          toolchain: canary
+          toolchain: nightly
           project: test/fixtures/passing
-          # TODO: enable once a canary toolchain ships `baml fmt --check` (BoundaryML/baml#5455).
+          # TODO: enable once a nightly toolchain ships `baml fmt --check` (BoundaryML/baml#5455).
           fmt: false
           # Only one matrix leg posts, so the comment isn't rewritten three times.
           comment: ${{ matrix.os == 'ubuntu-latest' }}
@@ -75,7 +75,7 @@ jobs:
         continue-on-error: true
         uses: ./
         with:
-          toolchain: canary
+          toolchain: nightly
           project: test/fixtures/failing
           fmt: false
           comment: false
@@ -85,7 +85,7 @@ jobs:
         continue-on-error: true
         uses: ./
         with:
-          toolchain: canary
+          toolchain: nightly
           project: test/fixtures/invalid
           test: false
           fmt: false
@@ -96,7 +96,7 @@ jobs:
         id: empty
         uses: ./
         with:
-          toolchain: canary
+          toolchain: nightly
           project: test/fixtures/empty
           fmt: false
           comment: false
