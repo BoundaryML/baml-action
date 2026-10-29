@@ -1,0 +1,89 @@
+# baml-action
+
+`BoundaryML/baml-action` checks, format-checks, tests, and measures a BAML project in one step. It installs BAML with [`BoundaryML/setup-baml`](https://github.com/BoundaryML/setup-baml), then runs:
+
+| Step | Command | Fails the job when |
+| --- | --- | --- |
+| check | `baml check` | the project has compiler errors |
+| fmt | `baml fmt --check` | any file is not formatted |
+| test | `baml test` | any test fails |
+| codequality | `baml codequality` | never; it only reports |
+
+Every enabled step runs even if an earlier one fails, so one run shows every problem. The job summary lists each step's result and the code quality report.
+
+## Usage
+
+```yaml
+name: BAML
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write # for the code quality comment
+
+jobs:
+  baml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: BoundaryML/baml-action@v1
+        env:
+          # Only needed if your tests call an LLM.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+```
+
+## Inputs
+
+| Input | Default | Description |
+| --- | --- | --- |
+| `toolchain` | from `baml.toml` | Toolchain selector passed to `setup-baml`: an exact version, `canary`, or `nightly`. |
+| `project` | `.` | Project directory, passed as `--project`. |
+| `check` | `true` | Run `baml check`. |
+| `fmt` | `true` | Run `baml fmt --check`. |
+| `test` | `true` | Run `baml test`. A project with no tests passes with a notice. |
+| `test-profile` | | Test profile from `baml.toml`, passed as `baml test --profile`. |
+| `codequality` | `true` | Run `baml codequality`. |
+| `comment` | `true` | On pull requests, post a code quality comment. |
+| `github-token` | `github.token` | Token for the comment. Needs `pull-requests: write`. |
+
+## Outputs
+
+| Output | Description |
+| --- | --- |
+| `version` | Resolved concrete BAML toolchain version |
+
+## Code quality comment
+
+On pull requests, the action measures the project at the pull request's base commit and at the checked-out commit, and comments with the functions whose cognitive complexity, cyclomatic complexity, NPath, nesting depth, or exit count went up or down, plus any new functions. The comment is updated in place on each push. It is only posted once something changed, and is updated to say so if a later push undoes the change.
+
+Both commits are measured with the same toolchain, so a toolchain upgrade does not show up as a code change.
+
+Pull requests from forks get a read-only token, so the action skips the comment there and leaves the comparison in the job summary. To post as a GitHub App instead of `github-actions[bot]`, pass that app's installation token as `github-token`.
+
+## Several projects
+
+Run the action once per project. Each project gets its own summary section and its own comment.
+
+```yaml
+strategy:
+  matrix:
+    project: [services/agent, services/extractor]
+steps:
+  - uses: actions/checkout@v5
+  - uses: BoundaryML/baml-action@v1
+    with:
+      project: ${{ matrix.project }}
+```
+
+## Pinning
+
+The action pins `setup-baml` to a full commit SHA. For the same reproducibility in your workflow, pin this action to a commit SHA and let Dependabot or Renovate propose updates:
+
+```yaml
+- uses: BoundaryML/baml-action@0123456789abcdef0123456789abcdef01234567 # replace with a reviewed commit
+```

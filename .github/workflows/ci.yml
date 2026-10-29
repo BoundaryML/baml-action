@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Test comment rendering
+        run: python3 -m unittest discover -s test -v
+
+      - name: Lint Bash
+        run: shellcheck scripts/*.sh
+
+      - name: Lint workflows and action metadata
+        uses: docker://rhysd/actionlint:1.7.12
+        with:
+          args: -color
+
+  passing:
+    name: Passing project (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Run BAML
+        id: baml
+        uses: ./
+        with:
+          toolchain: canary
+          project: test/fixtures/passing
+          # TODO: enable once a canary toolchain ships `baml fmt --check` (BoundaryML/baml#5455).
+          fmt: false
+          # Only one matrix leg posts, so the comment isn't rewritten three times.
+          comment: ${{ matrix.os == 'ubuntu-latest' }}
+
+      - name: Verify version output
+        shell: bash
+        env:
+          VERSION: ${{ steps.baml.outputs.version }}
+        run: test -n "$VERSION"
+
+  failing:
+    name: Failing projects report each failure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Failing tests
+        id: failing
+        continue-on-error: true
+        uses: ./
+        with:
+          toolchain: canary
+          project: test/fixtures/failing
+          fmt: false
+          comment: false
+
+      - name: Type error
+        id: invalid
+        continue-on-error: true
+        uses: ./
+        with:
+          toolchain: canary
+          project: test/fixtures/invalid
+          test: false
+          fmt: false
+          codequality: false
+          comment: false
+
+      - name: No tests
+        id: empty
+        uses: ./
+        with:
+          toolchain: canary
+          project: test/fixtures/empty
+          fmt: false
+          comment: false
+
+      - name: Verify outcomes
+        env:
+          FAILING: ${{ steps.failing.outcome }}
+          INVALID: ${{ steps.invalid.outcome }}
+        run: |
+          test "$FAILING" = failure
+          test "$INVALID" = failure
