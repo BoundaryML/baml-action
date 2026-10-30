@@ -8,33 +8,40 @@ function clamp(value: int, low: int, high: int) -> int {
     }
 }
 
-function shipping_cost(weight: int, express: bool, international: bool) -> int {
+function shipping_cost(weight: int, express: bool, international: bool, members: int[]) -> int {
     let cost = weight * 2;
     if (express) {
-        cost = cost * 2;
+        if (international) {
+            cost = cost * 3;
+        } else {
+            cost = cost * 2;
+        }
     }
-    if (international) {
+    for (let m in members) {
+        if (m > 0) {
+            if (cost > 10) {
+                cost = cost - 1;
+            }
+        }
+    }
+    if (international && weight > 20) {
         cost = cost + 15;
     }
     cost
 }
 
 function grade(score: int) -> string {
-    if (score >= 90) {
-        "A"
-    } else if (score >= 80) {
-        "B"
-    } else if (score >= 70) {
-        "C"
-    } else if (score >= 60) {
-        "D"
-    } else {
-        "F"
-    }
+    if (score >= 60) { "pass" } else { "fail" }
 }
 
-function legacy_discount(total: int) -> int {
-    if (total > 100) { total - 10 } else { total }
+function total_weight(weights: int[]) -> int {
+    let total = 0;
+    for (let w in weights) {
+        if (w > 0) {
+            total = total + w;
+        }
+    }
+    total
 }
 
 
