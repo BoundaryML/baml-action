@@ -12,8 +12,15 @@ class FunctionReport {
     exits: int,
 }
 
+/// One file in the report.
+class FileReport {
+    file: string,
+    lines: int,
+}
+
 class Report {
     functions: FunctionReport[],
+    files: FileReport[],
 }
 
 enum Metric {
@@ -42,6 +49,9 @@ function metric_value(report: FunctionReport, metric: Metric) -> bigint {
 function parse_report(text: string) -> Report throws baml.json.ParseError | baml.json.DecodeError {
     let report = baml.json.decode<Report>(text);
     for (let f in report.functions) {
+        f.file = f.file.replace_all("\\", "/");
+    }
+    for (let f in report.files) {
         f.file = f.file.replace_all("\\", "/");
     }
     report

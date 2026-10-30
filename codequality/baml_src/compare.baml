@@ -15,6 +15,8 @@ class Comparison {
     better: FunctionChange[],
     added: FunctionReport[],
     removed: int,
+    before: Summary,
+    after: Summary,
 }
 
 /// An exact fraction, because NPath can be too large for a float.
@@ -131,6 +133,8 @@ function compare(base: Report, head: Report) -> Comparison {
                 !head_functions.has(key)
             })
             .length(),
+        before: summarize(base),
+        after: summarize(head),
     }
 }
 

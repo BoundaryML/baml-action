@@ -1,18 +1,23 @@
-/// The collapsed reference at the end of the comment. Every example's score
-/// was checked with `baml codequality`.
+/// The collapsed reference at the end of the comment.
+/// Every example's score was checked with `baml codequality`.
 ///
 /// A quoted string rather than a backtick one: the parser's backtick-close
 /// lookahead stops at a line starting with `function` and skips `//`, both of
 /// which the BAML examples contain.
 function explanations() -> string {
-    "#### What these mean
+    "<details>
+<summary>What these mean</summary>
+
+- **Cognitive**: how hard the function is to follow. Each branch or loop adds 1, plus 1 more for every level it is nested inside.
+- **Cyclomatic**: how many decisions it makes. 1, plus 1 for each `if`, `else if`, loop, `&&` and `||`.
+- **NPath**: how many paths a test would need to cover. Branches in a row multiply.
+- **Nesting**: how deep the deepest block goes.
+- **Exits**: how many places it can return: each `return` and `throw`, plus the final expression.
 
 <details>
-<summary>Cognitive: how hard the function is to follow</summary>
+<summary>Examples</summary>
 
-Each branch or loop adds 1, plus 1 more for every level it is nested inside. Deep nesting costs the most.
-
-Scores 7:
+Cognitive 7:
 
 ```baml
 function capped_total(scores: int[]) -> int {
@@ -30,7 +35,7 @@ function capped_total(scores: int[]) -> int {
 }
 ```
 
-Scores 1, with the branching moved into `cap`:
+Cognitive 1, with the branching moved into `cap`:
 
 ```baml
 function capped_total(scores: int[]) -> int {
@@ -42,12 +47,7 @@ function capped_total(scores: int[]) -> int {
 }
 ```
 
-</details>
-
-<details>
-<summary>Cyclomatic: how many decisions the function makes</summary>
-
-1, plus 1 for each `if`, `else if`, loop, `&&` and `||`. Nesting does not matter. Scores 5:
+Cyclomatic 5:
 
 ```baml
 function shipping(region: string, heavy: bool) -> int {
@@ -69,12 +69,7 @@ function shipping(region: string, heavy: bool) -> int {
 }
 ```
 
-</details>
-
-<details>
-<summary>NPath: how many paths a test would need to cover</summary>
-
-Branches in a row multiply. Three independent `if`s give 2 x 2 x 2 = 8 paths, even though cyclomatic is only 4.
+NPath 8 (2 x 2 x 2), though cyclomatic is only 4:
 
 ```baml
 function flags(a: bool, b: bool, c: bool) -> string {
@@ -92,12 +87,7 @@ function flags(a: bool, b: bool, c: bool) -> string {
 }
 ```
 
-</details>
-
-<details>
-<summary>Nesting: how deep the deepest block goes</summary>
-
-The most blocks open at once. Early returns and helper functions flatten it. Depth 3:
+Nesting 3:
 
 ```baml
 function total_size(rows: Row[]) -> int {
@@ -114,11 +104,6 @@ function total_size(rows: Row[]) -> int {
 ```
 
 </details>
-
-<details>
-<summary>Exits: how many places the function can return</summary>
-
-Each `return` and `throw`, plus the final expression. More exits mean more places to check when reading what a function gives back.
 
 </details>"
 }
