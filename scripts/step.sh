@@ -10,15 +10,6 @@ mkdir -p "$work"
 # CI is not an agent, and its logs have no terminal to color or animate.
 flags=(--agent-skill-check off --color never --no-progress)
 
-python_bin() {
-  # On Windows, python3 can be the Microsoft Store stub.
-  if [[ "${RUNNER_OS:-}" != "Windows" ]] && command -v python3 >/dev/null 2>&1; then
-    echo python3
-  else
-    echo python
-  fi
-}
-
 run_check() {
   baml "${flags[@]}" --project "$project" check
 }
@@ -133,15 +124,18 @@ run_codequality() {
   fi
 
   local status
-  status="$("$(python_bin)" "$GITHUB_ACTION_PATH/scripts/codequality_comment.py" \
+  # The renderer is a BAML project pinned to its own toolchain, so drop
+  # setup-baml's BAML_VERSION and let its baml.toml choose.
+  status="$(env -u BAML_VERSION BAML_TELEMETRY=off \
+    baml "${flags[@]}" --project "$GITHUB_ACTION_PATH/codequality" run main -- \
     ${base_args[@]+"${base_args[@]}"} \
     --head "$work/head.json" \
     --out "$summary" \
-    --server-url "$GITHUB_SERVER_URL" \
+    --server_url "$GITHUB_SERVER_URL" \
     --repo "$GITHUB_REPOSITORY" \
-    --head-sha "$(git -C "$project" rev-parse HEAD)" \
-    --base-label "$PR_BASE_REF" \
-    --project-prefix "$(git -C "$project" rev-parse --show-prefix)" \
+    --head_sha "$(git -C "$project" rev-parse HEAD)" \
+    --base_label "$PR_BASE_REF" \
+    --project_prefix "$(git -C "$project" rev-parse --show-prefix)" \
     --project "$project")"
   cat "$summary"
 

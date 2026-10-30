@@ -18,8 +18,15 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Set up BAML
+        uses: BoundaryML/setup-baml@01c5b25be8c853c3192c3891a0fc62f2a3ea4969 # main
+        with:
+          toolchain: nightly
+
+      # Unset BAML_VERSION so the renderer's own baml.toml picks its toolchain,
+      # as it does when the action runs it.
       - name: Test comment rendering
-        run: python3 -m unittest discover -s test -v
+        run: env -u BAML_VERSION baml --agent-skill-check off --color never --no-progress --project codequality test
 
       - name: Lint Bash
         run: shellcheck scripts/*.sh
