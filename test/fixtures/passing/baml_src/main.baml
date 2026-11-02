@@ -12,31 +12,25 @@ function express_multiplier(express: bool, international: bool) -> int {
     }
 }
 
-function member_discount(cost: int, members: int[]) -> int {
-    if (cost <= 10) {
-        return cost;
-    }
-    (
-        cost
-            - members
-                .filter((m) -> {
-                    m > 0
-                })
-                .length()
-    )
-}
-
-function oversize_fee(weight: int, international: bool) -> int {
-    if (international && weight > 20) {
-        15
-    } else {
-        0
-    }
-}
-
 function shipping_cost(weight: int, express: bool, international: bool, members: int[]) -> int {
     let cost = weight * 2 * express_multiplier(express, international);
-    member_discount(cost, members) + oversize_fee(weight, international)
+    for (let m in members) {
+        if (m > 0) {
+            if (cost > 10) {
+                if (m > 100 && !international) {
+                    cost = cost - 2;
+                } else {
+                    cost = cost - 1;
+                }
+            }
+        }
+    }
+    if (international && weight > 20) {
+        cost = cost + 15;
+    } else if (international || weight > 50) {
+        cost = cost + 5;
+    }
+    cost
 }
 
 test "clamp keeps values in range" {
@@ -46,7 +40,7 @@ test "clamp keeps values in range" {
 }
 
 test "shipping cost" {
-    assert.equal(shipping_cost(10, true, true, [1, 2]), 58);
+    assert.equal(shipping_cost(10, true, true, [1, 2]), 63);
     assert.equal(shipping_cost(30, false, true, []), 75);
     assert.equal(shipping_cost(3, false, false, [5]), 6)
 }
