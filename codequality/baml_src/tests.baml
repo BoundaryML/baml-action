@@ -3,11 +3,11 @@ function fn_report(
     file: string = "baml_src/main.baml",
     start_line: int = 1,
     end_line: int = 3,
-    cognitive: int = 0,
-    cyclomatic: int = 1,
+    cognitive: bigint = 0n,
+    cyclomatic: bigint = 1n,
     npath: bigint = 1n,
-    nesting: int = 0,
-    exits: int = 1,
+    nesting: bigint = 0n,
+    exits: bigint = 1n,
 ) -> FunctionReport {
     FunctionReport {
         name: name,
@@ -45,19 +45,19 @@ function names(changes: FunctionChange[]) -> string[] {
 
 testset "compare" {
     test "unchanged reports nothing" {
-        let r = report_of([fn_report("a", cognitive = 3)]);
-        let comparison = compare(r, r);
+        let r = report_of([fn_report("a", cognitive = 3n)]);
+        let comparison = Comparison.new(r, r);
         assert.equal(comparison.worse, []);
         assert.equal(comparison.better, []);
         assert.equal(comparison.added, []);
         assert.equal(comparison.removed, 0);
-        assert.equal(changed(comparison), false)
+        assert.equal(comparison.changed(), false)
     }
 
     test "one row per function with every changed metric" {
-        let comparison = compare(
-            report_of([fn_report("a", cognitive = 2, nesting = 1, exits = 3)]),
-            report_of([fn_report("a", cognitive = 5, nesting = 2, exits = 1)]),
+        let comparison = Comparison.new(
+            report_of([fn_report("a", cognitive = 2n, nesting = 1n, exits = 3n)]),
+            report_of([fn_report("a", cognitive = 5n, nesting = 2n, exits = 1n)]),
         );
         assert.equal(comparison.worse.length(), 1);
         assert.equal(comparison.better, []);
@@ -72,31 +72,34 @@ testset "compare" {
     }
 
     test "only improvements is better" {
-        let comparison = compare(report_of([fn_report("a", cognitive = 5)]), report_of([fn_report("a", cognitive = 1)]));
+        let comparison = Comparison.new(
+            report_of([fn_report("a", cognitive = 5n)]),
+            report_of([fn_report("a", cognitive = 1n)]),
+        );
         assert.equal(comparison.worse, []);
         assert.equal(names(comparison.better), ["a"])
     }
 
     test "worse sorted by relative increase" {
-        let comparison = compare(
-            report_of([fn_report("small", cognitive = 10), fn_report("big", cognitive = 1)]),
-            report_of([fn_report("small", cognitive = 12), fn_report("big", cognitive = 4)]),
+        let comparison = Comparison.new(
+            report_of([fn_report("small", cognitive = 10n), fn_report("big", cognitive = 1n)]),
+            report_of([fn_report("small", cognitive = 12n), fn_report("big", cognitive = 4n)]),
         );
         assert.equal(names(comparison.worse), ["big", "small"])
     }
 
     test "worse sorted by the largest metric increase" {
-        let comparison = compare(
+        let comparison = Comparison.new(
             report_of(
                 [
-                    fn_report("steady", cognitive = 10, nesting = 1),
-                    fn_report("spiky", cognitive = 10, nesting = 1),
+                    fn_report("steady", cognitive = 10n, nesting = 1n),
+                    fn_report("spiky", cognitive = 10n, nesting = 1n),
                 ],
             ),
             report_of(
                 [
-                    fn_report("steady", cognitive = 15, nesting = 1),
-                    fn_report("spiky", cognitive = 11, nesting = 4),
+                    fn_report("steady", cognitive = 15n, nesting = 1n),
+                    fn_report("spiky", cognitive = 11n, nesting = 4n),
                 ],
             ),
         );
@@ -104,7 +107,10 @@ testset "compare" {
     }
 
     test "increase from zero is worse" {
-        let comparison = compare(report_of([fn_report("a", cognitive = 0)]), report_of([fn_report("a", cognitive = 1)]));
+        let comparison = Comparison.new(
+            report_of([fn_report("a", cognitive = 0n)]),
+            report_of([fn_report("a", cognitive = 1n)]),
+        );
         assert.equal(
             comparison.worse[0].changes,
             [MetricChange { metric: Metric.Cognitive, before: 0n, after: 1n }],
@@ -112,12 +118,12 @@ testset "compare" {
     }
 
     test "same name in different files are different functions" {
-        let comparison = compare(
-            report_of([fn_report("a", file = "x.baml", cognitive = 1)]),
+        let comparison = Comparison.new(
+            report_of([fn_report("a", file = "x.baml", cognitive = 1n)]),
             report_of(
                 [
-                    fn_report("a", file = "x.baml", cognitive = 1),
-                    fn_report("a", file = "y.baml", cognitive = 9),
+                    fn_report("a", file = "x.baml", cognitive = 1n),
+                    fn_report("a", file = "y.baml", cognitive = 9n),
                 ],
             ),
         );
@@ -131,7 +137,10 @@ testset "compare" {
     }
 
     test "added and removed" {
-        let comparison = compare(report_of([fn_report("gone")]), report_of([fn_report("fresh", cognitive = 4)]));
+        let comparison = Comparison.new(
+            report_of([fn_report("gone")]),
+            report_of([fn_report("fresh", cognitive = 4n)]),
+        );
         assert.equal(
             comparison.added.map((f) -> {
                 f.name
@@ -139,12 +148,12 @@ testset "compare" {
             ["fresh"],
         );
         assert.equal(comparison.removed, 1);
-        assert.is_true(changed(comparison))
+        assert.is_true(comparison.changed())
     }
 
     test "npath beyond float range" {
         let huge = 10n.pow(400n);
-        let comparison = compare(
+        let comparison = Comparison.new(
             report_of([fn_report("a", npath = huge), fn_report("b", npath = 2n)]),
             report_of([fn_report("a", npath = huge * 3n), fn_report("b", npath = 4n)]),
         );
@@ -154,7 +163,7 @@ testset "compare" {
 
 testset "parse_report" {
     test "decodes npath exactly and ignores other fields" {
-        let report = parse_report(
+        let report = Report.parse(
             `{"functions": [{"name": "a", "file": "baml_src\\\\main.baml", "start_line": 1, "end_line": 3, "lines": 3, "params": 0, "cognitive": 0, "cyclomatic": 1, "npath": 123456789012345678901234567890, "nesting": 0, "exits": 1, "fan_in": 0, "fan_out": 0}], "files": []}`,
         );
         assert.equal(report.functions[0].npath, 123456789012345678901234567890n);
@@ -164,17 +173,29 @@ testset "parse_report" {
 
 testset "render" {
     test "significant functions are one row each, worse first" {
-        let comparison = compare(
+        let comparison = Comparison.new(
             report_of(
                 [
-                    fn_report("Router.dispatch", start_line = 10, end_line = 40, cognitive = 9, nesting = 2),
-                    fn_report("Pipeline.run", cognitive = 22),
+                    fn_report(
+                        "Router.dispatch",
+                        start_line = 10,
+                        end_line = 40,
+                        cognitive = 9n,
+                        nesting = 2n,
+                    ),
+                    fn_report("Pipeline.run", cognitive = 22n),
                 ],
             ),
             report_of(
                 [
-                    fn_report("Router.dispatch", start_line = 10, end_line = 42, cognitive = 18, nesting = 1),
-                    fn_report("Pipeline.run", cognitive = 8),
+                    fn_report(
+                        "Router.dispatch",
+                        start_line = 10,
+                        end_line = 42,
+                        cognitive = 18n,
+                        nesting = 1n,
+                    ),
+                    fn_report("Pipeline.run", cognitive = 8n),
                 ],
             ),
         );
@@ -194,33 +215,33 @@ testset "render" {
     }
 
     test "headline" {
-        let one = report_of([fn_report("a", cognitive = 5)]);
-        assert.equal(headline(compare(one, one)), "**No function changed complexity.**");
+        let one = report_of([fn_report("a", cognitive = 5n)]);
+        assert.equal(Comparison.new(one, one).headline(), "**No function changed complexity.**");
         assert.equal(
-            headline(compare(one, report_of([fn_report("a", cognitive = 1)]))),
+            Comparison.new(one, report_of([fn_report("a", cognitive = 1n)])).headline(),
             "**No function got worse**, 1 got better.",
         );
         assert.equal(
-            headline(
-                compare(
+            Comparison
+                .new(
                     Report {
                         functions: [fn_report("a"), fn_report("b")],
-                        files: [file_report("x.baml", 35)],
+                        files: [file_report("x.baml", 35n)],
                     },
                     Report {
                         functions: [fn_report("a"), fn_report("c")],
-                        files: [file_report("x.baml", 42)],
+                        files: [file_report("x.baml", 42n)],
                     },
-                ),
-            ),
+                )
+                .headline(),
             "**No function got worse**. 1 new, 1 removed. Lines 35 &rarr; 42.",
         )
     }
 
     test "small changes are left out" {
-        let comparison = compare(
-            report_of([fn_report("small", cognitive = 2), fn_report("big", cognitive = 2)]),
-            report_of([fn_report("small", cognitive = 4), fn_report("big", cognitive = 5)]),
+        let comparison = Comparison.new(
+            report_of([fn_report("small", cognitive = 2n), fn_report("big", cognitive = 2n)]),
+            report_of([fn_report("small", cognitive = 4n), fn_report("big", cognitive = 5n)]),
         );
         let body = render(comparison, test_context());
         assert.contains(body, "**2 functions got worse**.");
@@ -229,7 +250,10 @@ testset "render" {
     }
 
     test "no table when nothing changed significantly" {
-        let comparison = compare(report_of([fn_report("a", cognitive = 2)]), report_of([fn_report("a", cognitive = 3)]));
+        let comparison = Comparison.new(
+            report_of([fn_report("a", cognitive = 2n)]),
+            report_of([fn_report("a", cognitive = 3n)]),
+        );
         assert.is_true(!render(comparison, test_context()).includes("| Function |"))
     }
 
@@ -237,7 +261,10 @@ testset "render" {
         let ctx = test_context();
         ctx.project_prefix = "services/agent/";
         ctx.project = "services/agent";
-        let body = render(compare(report_of([fn_report("a")]), report_of([fn_report("a", cognitive = 5)])), ctx);
+        let body = render(
+            Comparison.new(report_of([fn_report("a")]), report_of([fn_report("a", cognitive = 5n)])),
+            ctx,
+        );
         assert.contains(
             body,
             "/blob/a41c9e2f00000000000000000000000000000000/services/agent/baml_src/main.baml#L1-L3",
@@ -246,26 +273,26 @@ testset "render" {
     }
 
     test "unmeasured base" {
-        let body = render(null, test_context());
+        let body = render(Unmeasured {}, test_context());
         assert.contains(body, "Could not measure `canary`");
         assert.is_true(!body.includes("What these mean"))
     }
 
     test "rows are capped" {
-        let count = max_rows() + 3;
+        let count = MAX_ROWS + 3;
         let base = report_of(
             baml.Array.generate(count, (i) -> {
-                fn_report(`f${i}`, cognitive = 1)
+                fn_report(`f${i}`, cognitive = 1n)
             }),
         );
         let head = report_of(
             baml.Array.generate(count, (i) -> {
-                fn_report(`f${i}`, cognitive = 5)
+                fn_report(`f${i}`, cognitive = 5n)
             }),
         );
-        let body = render(compare(base, head), test_context());
+        let body = render(Comparison.new(base, head), test_context());
         assert.contains(body, "...and 3 more.");
-        assert.equal(body.split("\n| [`f").length() - 1, max_rows())
+        assert.equal(body.split("\n| [`f").length() - 1, MAX_ROWS)
     }
 }
 
@@ -291,32 +318,33 @@ testset "render_reports" {
     }
 
     test "normalize_prefix" {
-        assert.equal(normalize_prefix(""), "");
-        assert.equal(normalize_prefix("."), "");
-        assert.equal(normalize_prefix("services/agent/"), "services/agent/");
-        assert.equal(normalize_prefix("services\\agent\\"), "services/agent/")
+        assert.equal(Context.normalize_prefix(""), "");
+        assert.equal(Context.normalize_prefix("."), "");
+        assert.equal(Context.normalize_prefix("services/agent/"), "services/agent/");
+        assert.equal(Context.normalize_prefix("services\\agent\\"), "services/agent/")
     }
 }
 
-function file_report(file: string, lines: int) -> FileReport {
+function file_report(file: string, lines: bigint) -> FileReport {
     FileReport { file: file, lines: lines }
 }
 
 testset "summary" {
     test "summarize" {
-        let summary = summarize(
+        let summary = (
             Report {
                 functions: [
-                    fn_report("a", cognitive = 3, nesting = 1, npath = 3n),
-                    fn_report("b", cognitive = 12, nesting = 3, npath = 36n),
+                    fn_report("a", cognitive = 3n, nesting = 1n, npath = 3n),
+                    fn_report("b", cognitive = 12n, nesting = 3n, npath = 36n),
                 ],
-                files: [file_report("x.baml", 30), file_report("y.baml", 12)],
-            },
-        );
+                files: [file_report("x.baml", 30n), file_report("y.baml", 12n)],
+            }
+        )
+            .summary();
         assert.equal(summary.functions, 2);
-        assert.equal(summary.lines, 42);
-        assert.equal(average(summary, Metric.Cognitive), Ratio { numerator: 15n, denominator: 2n });
-        assert.equal(average(summarize(report_of([])), Metric.NPath), null)
+        assert.equal(summary.lines, 42n);
+        assert.equal(summary.average(Metric.Cognitive), Ratio { numerator: 15n, denominator: 2n });
+        assert.equal(report_of([]).summary().average(Metric.NPath), null)
     }
 
     test "count reads as baml codequality writes it" {
@@ -343,14 +371,14 @@ testset "summary" {
 
 testset "radar" {
     test "radar shows health relative to the base and capped" {
-        let comparison = compare(
-            report_of([fn_report("a", cognitive = 4, npath = 20n, nesting = 1)]),
-            report_of([fn_report("a", cognitive = 8, npath = 2n, nesting = 0)]),
+        let comparison = Comparison.new(
+            report_of([fn_report("a", cognitive = 4n, npath = 20n, nesting = 1n)]),
+            report_of([fn_report("a", cognitive = 8n, npath = 2n, nesting = 0n)]),
         );
-        assert.equal(health_percent(comparison, Metric.Cognitive), 50n);
-        assert.equal(health_percent(comparison, Metric.NPath), 1000n);
-        assert.equal(health_percent(comparison, Metric.Nesting), null);
-        assert.equal(health_percent(comparison, Metric.Exits), 100n);
+        assert.equal(RadarAxis.of(comparison, Metric.Cognitive).health, 50n);
+        assert.equal(RadarAxis.of(comparison, Metric.NPath).health, 1000n);
+        assert.equal(RadarAxis.of(comparison, Metric.Nesting).health, null);
+        assert.equal(RadarAxis.of(comparison, Metric.Exits).health, 100n);
         let body = render(comparison, test_context());
         assert.contains(
             body,
@@ -362,39 +390,42 @@ testset "radar" {
     }
 
     test "radar leaves room above the base" {
-        let comparison = compare(report_of([fn_report("a", cognitive = 4)]), report_of([fn_report("a", cognitive = 8)]));
+        let comparison = Comparison.new(
+            report_of([fn_report("a", cognitive = 4n)]),
+            report_of([fn_report("a", cognitive = 8n)]),
+        );
         assert.contains(render(comparison, test_context()), "  max 150")
     }
 
     test "no radar when no average moved or the base had no functions" {
-        let same = report_of([fn_report("a", cognitive = 3)]);
-        assert.is_true(!render(compare(same, same), test_context()).includes("mermaid"));
-        assert.is_true(!render(compare(report_of([]), same), test_context()).includes("mermaid"))
+        let same = report_of([fn_report("a", cognitive = 3n)]);
+        assert.is_true(!render(Comparison.new(same, same), test_context()).includes("mermaid"));
+        assert.is_true(
+            !render(Comparison.new(report_of([]), same), test_context()).includes("mermaid"),
+        )
     }
 }
 
 testset "significance" {
     test "npath must double" {
         assert.is_true(
-            !significant_change(MetricChange { metric: Metric.NPath, before: 8n, after: 12n }),
+            !(MetricChange { metric: Metric.NPath, before: 8n, after: 12n }).significant(),
         );
         assert.is_true(
-            significant_change(MetricChange { metric: Metric.NPath, before: 8n, after: 16n }),
+            (MetricChange { metric: Metric.NPath, before: 8n, after: 16n }).significant(),
         );
         assert.is_true(
-            !significant_change(MetricChange { metric: Metric.NPath, before: 1n, after: 2n }),
+            !(MetricChange { metric: Metric.NPath, before: 1n, after: 2n }).significant(),
         );
         assert.is_true(
-            significant_change(MetricChange { metric: Metric.NPath, before: 36n, after: 4n }),
+            (MetricChange { metric: Metric.NPath, before: 36n, after: 4n }).significant(),
         )
     }
 
     test "nesting and exits need two" {
         assert.is_true(
-            !significant_change(MetricChange { metric: Metric.Nesting, before: 1n, after: 2n }),
+            !(MetricChange { metric: Metric.Nesting, before: 1n, after: 2n }).significant(),
         );
-        assert.is_true(
-            significant_change(MetricChange { metric: Metric.Exits, before: 3n, after: 1n }),
-        )
+        assert.is_true((MetricChange { metric: Metric.Exits, before: 3n, after: 1n }).significant())
     }
 }

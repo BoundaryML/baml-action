@@ -1,11 +1,5 @@
 function clamp(value: int, low: int, high: int) -> int {
-    if (value < low) {
-        low
-    } else if (value > high) {
-        high
-    } else {
-        value
-    }
+    value.clamp(low, high)
 }
 
 test "clamp keeps values in range" {

@@ -1,14 +1,126 @@
+/// The smallest change in cognitive or cyclomatic complexity worth a table row.
+const BRANCH_STEP = 3n;
+
+/// The smallest change in nesting depth or exit count worth a table row.
+const DEPTH_STEP = 2n;
+
+/// The smallest change in NPath worth a table row, on top of doubling or
+/// halving: NPath multiplies, so 1 to 2 paths is noise.
+const NPATH_STEP = 4n;
+
 class MetricChange {
     metric: Metric,
     before: bigint,
     after: bigint,
+
+    /// Whether the metric moved enough to be worth a reviewer's attention.
+    function significant(self) -> bool {
+        let smaller = self.before.min(self.after);
+        let larger = self.before.max(self.after);
+        let step = larger - smaller;
+        match (self.metric) {
+            Metric.NPath => larger >= smaller * 2n && step >= NPATH_STEP,
+            Metric.Nesting | Metric.Exits => step >= DEPTH_STEP,
+            Metric.Cognitive | Metric.Cyclomatic => step >= BRANCH_STEP,
+        }
+    }
+
+    /// How much the metric grew, as `after / before` from zero up counting as
+    /// from one.
+    function growth(self) -> Ratio {
+        Ratio.new(self.after, self.before.max(1n))
+    }
+
+    /// How much the metric shrank, the inverse of `growth`.
+    function shrinkage(self) -> Ratio {
+        Ratio.new(self.before, self.after.max(1n))
+    }
+
+    implements baml.ToString {
+        function to_string(self) -> string {
+            `${metric_word(self.metric)} ${count(self.before)} &rarr; ${count(self.after)}`
+        }
+    }
 }
 
-/// One table row: a function and every metric of it that changed.
+/// A function in both reports, and every metric of it that changed.
 class FunctionChange {
     report: FunctionReport,
     changes: MetricChange[],
+
+    function between(before: FunctionReport, after: FunctionReport) -> Self {
+        FunctionChange {
+            report: after,
+            changes: ALL_METRICS.filter_map((m) -> {
+                let change = MetricChange { metric: m, before: before.value(m), after: after.value(m) };
+                if (change.before != change.after) {
+                    change
+                } else {
+                    null
+                }
+            }),
+        }
+    }
+
+    /// A function is worse if any metric went up, and better if metrics only
+    /// went down.
+    function worse(self) -> bool {
+        self.changes.some((c) -> {
+            c.after > c.before
+        })
+    }
+
+    function significant(self) -> bool {
+        self.changes.some((c) -> {
+            c.significant()
+        })
+    }
+
+    /// How far the most-changed metric moved in the function's direction.
+    function largest_move(self) -> Ratio {
+        let moves = self.changes.map((c) -> {
+            if (self.worse()) {
+                c.growth()
+            } else {
+                c.shrinkage()
+            }
+        });
+        moves.reduce(
+            (largest, r) -> {
+                largest.max(r)
+            },
+            Ratio.new(0n, 1n),
+        )
+    }
+
+    implements baml.ToString {
+        function to_string(self) -> string {
+            let direction = if (self.worse()) {
+                "**Worse**"
+            } else {
+                "**Better**"
+            };
+            `${direction}: ${self.changes.map((c) -> { c.to_string() }).join(", ")}`
+        }
+    }
 }
+
+/// Biggest move first, then by name and file so the order is stable.
+function by_largest_move(changes: FunctionChange[]) -> FunctionChange[] {
+    changes.sort_by((a, b) -> {
+        let by_move = b.largest_move().cmp(a.largest_move());
+        match (by_move) {
+            baml.ops.Ordering.Equal => a.report.key().cmp(b.report.key()),
+            _ => by_move,
+        }
+    })
+}
+
+/// The base could not be measured, so there is nothing to compare against.
+class Unmeasured {
+}
+
+type Outcome = Comparison | Unmeasured;
 
 class Comparison {
     worse: FunctionChange[],
@@ -17,130 +129,107 @@ class Comparison {
     removed: int,
     before: Summary,
     after: Summary,
-}
 
-/// An exact fraction, because NPath can be too large for a float.
-class Ratio {
-    numerator: bigint,
-    denominator: bigint,
-}
-
-function function_key(report: FunctionReport) -> string {
-    `${report.file}\n${report.name}`
-}
-
-/// Functions by key, keeping the first of any duplicates.
-function functions_by_key(report: Report) -> map<string, FunctionReport> {
-    let functions: map<string, FunctionReport> = {};
-    for (let f in report.functions) {
-        let _ = functions.get_or_insert(function_key(f), f);
+    function new(base: Report, head: Report) -> Self {
+        let base_functions = base.functions_by_key();
+        let head_functions = head.functions_by_key();
+        let changed = head_functions.values()
+            .filter_map((after) -> {
+                match (base_functions.get(after.key())) {
+                    null => null,
+                    let before: FunctionReport => FunctionChange.between(before, after),
+                }
+            })
+            .filter((c) -> {
+                c.changes.length() > 0
+            });
+        Comparison {
+            worse: by_largest_move(
+                changed.filter((c) -> {
+                    c.worse()
+                }),
+            ),
+            better: by_largest_move(
+                changed.filter((c) -> {
+                    !c.worse()
+                }),
+            ),
+            added: head_functions.values()
+                .filter((f) -> {
+                    !base_functions.has(f.key())
+                })
+                .sort_by((a, b) -> {
+                    match (b.cognitive.cmp(a.cognitive)) {
+                        baml.ops.Ordering.Equal => a.name.cmp(b.name),
+                        let by_cognitive => by_cognitive,
+                    }
+                }),
+            removed: base_functions.keys()
+                .filter((key) -> {
+                    !head_functions.has(key)
+                })
+                .length(),
+            before: base.summary(),
+            after: head.summary(),
+        }
     }
-    functions
-}
 
-function ratio(numerator: bigint, denominator: bigint) -> Ratio {
-    Ratio {
-        numerator: numerator,
-        denominator: if (denominator < 1n) {
-            1n
-        } else {
-            denominator
-        },
+    function changed(self) -> bool {
+        self.worse || self.better || self.added || self.removed
     }
-}
 
-function compare_ratios(a: Ratio, b: Ratio) -> baml.ops.Ordering {
-    (a.numerator * b.denominator).cmp(b.numerator * a.denominator)
-}
+    /// The first line: how many functions got worse or better, how many came
+    /// and went, and how the project's size changed.
+    function headline(self) -> string {
+        [self.verdict(), self.arrivals(), self.size_change()]
+            .filter_map((sentence) -> {
+                sentence
+            })
+            .join(" ")
+    }
 
-/// How much the function's most-changed metric grew (for a worse function)
-/// or shrank (for a better one).
-function largest_ratio(change: FunctionChange, worse: bool) -> Ratio {
-    let largest = ratio(0n, 1n);
-    for (let c in change.changes) {
-        let r = if (worse) {
-            ratio(c.after, c.before)
-        } else {
-            ratio(c.before, c.after)
+    function verdict(self) -> string {
+        if (!self.changed()) {
+            return "**No function changed complexity.**";
+        }
+        let worse = match (self.worse.length()) {
+            0 => "**No function got worse**",
+            let n => `**${plural(n, "function")} got worse**`,
         };
-        if (compare_ratios(r, largest) == baml.ops.Ordering.Greater) {
-            largest = r;
+        if (self.better) {
+            return `${worse}, ${self.better.length()} got better.`;
         }
-    }
-    largest
-}
-
-/// Biggest change first, then by name and file so the order is stable.
-function sort_changes(changes: FunctionChange[], worse: bool) -> FunctionChange[] {
-    changes.sort_by((a, b) -> {
-        let by_ratio = compare_ratios(largest_ratio(b, worse), largest_ratio(a, worse));
-        if (by_ratio != baml.ops.Ordering.Equal) {
-            by_ratio
-        } else if (a.report.name != b.report.name) {
-            a.report.name.cmp(b.report.name)
-        } else {
-            a.report.file.cmp(b.report.file)
-        }
-    })
-}
-
-/// A function is worse if any metric went up, and better if metrics only went down.
-function compare(base: Report, head: Report) -> Comparison {
-    let base_functions = functions_by_key(base);
-    let head_functions = functions_by_key(head);
-    let worse: FunctionChange[] = [];
-    let better: FunctionChange[] = [];
-    let added: FunctionReport[] = [];
-
-    for (let after in head_functions.values()) {
-        let before = base_functions.get(function_key(after));
-        if (before == null) {
-            added.push(after);
-            continue;
-        }
-        let changes: MetricChange[] = [];
-        for (let metric in all_metrics()) {
-            let old = metric_value(before, metric);
-            let new = metric_value(after, metric);
-            if (old != new) {
-                changes.push(MetricChange { metric: metric, before: old, after: new });
-            }
-        }
-        if (
-            changes.some((c) -> {
-                c.after > c.before
-            })
-        ) {
-            worse.push(FunctionChange { report: after, changes: changes });
-        } else if (changes.length() > 0) {
-            better.push(FunctionChange { report: after, changes: changes });
-        }
+        `${worse}.`
     }
 
-    added.sort_by((a, b) -> {
-        if (a.cognitive != b.cognitive) {
-            b.cognitive.cmp(a.cognitive)
-        } else {
-            a.name.cmp(b.name)
+    /// Functions added and removed; null when neither happened.
+    function arrivals(self) -> string? {
+        let parts = [
+            if (self.added) {
+                `${self.added.length()} new`
+            } else {
+                null
+            },
+            if (self.removed) {
+                `${self.removed} removed`
+            } else {
+                null
+            },
+        ]
+            .filter_map((part) -> {
+                part
+            });
+        if (!parts) {
+            return null;
         }
-    });
-    Comparison {
-        worse: sort_changes(worse, true),
-        better: sort_changes(better, false),
-        added: added,
-        removed: base_functions.keys()
-            .filter((key) -> {
-                !head_functions.has(key)
-            })
-            .length(),
-        before: summarize(base),
-        after: summarize(head),
+        `${parts.join(", ")}.`
     }
-}
 
-function changed(comparison: Comparison) -> bool {
-    comparison.worse.length() > 0
-        || comparison.better.length() > 0
-        || comparison.added.length() > 0
-        || comparison.removed > 0
+    /// The line count before and after; null when it did not change.
+    function size_change(self) -> string? {
+        if (self.before.lines == self.after.lines) {
+            return null;
+        }
+        `Lines ${count(self.before.lines)} &rarr; ${count(self.after.lines)}.`
+    }
 }
