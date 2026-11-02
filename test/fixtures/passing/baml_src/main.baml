@@ -2,26 +2,41 @@ function clamp(value: int, low: int, high: int) -> int {
     value.clamp(low, high)
 }
 
-function shipping_cost(weight: int, express: bool, international: bool, members: int[]) -> int {
-    let cost = weight * 2;
-    if (express) {
-        if (international) {
-            cost = cost * 3;
-        } else {
-            cost = cost * 2;
-        }
+function express_multiplier(express: bool, international: bool) -> int {
+    if (!express) {
+        return 1;
     }
-    for (let m in members) {
-        if (m > 0) {
-            if (cost > 10) {
-                cost = cost - 1;
-            }
-        }
+    match (international) {
+        true => 3,
+        false => 2,
     }
+}
+
+function member_discount(cost: int, members: int[]) -> int {
+    if (cost <= 10) {
+        return cost;
+    }
+    (
+        cost
+            - members
+                .filter((m) -> {
+                    m > 0
+                })
+                .length()
+    )
+}
+
+function oversize_fee(weight: int, international: bool) -> int {
     if (international && weight > 20) {
-        cost = cost + 15;
+        15
+    } else {
+        0
     }
-    cost
+}
+
+function shipping_cost(weight: int, express: bool, international: bool, members: int[]) -> int {
+    let cost = weight * 2 * express_multiplier(express, international);
+    member_discount(cost, members) + oversize_fee(weight, international)
 }
 
 test "clamp keeps values in range" {
