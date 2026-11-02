@@ -51,7 +51,7 @@ testset "compare" {
         assert.equal(comparison.better, []);
         assert.equal(comparison.added, []);
         assert.equal(comparison.removed, 0);
-        assert.equal(comparison.changed(), false)
+        assert.is_true(!comparison.changed())
     }
 
     test "one row per function with every changed metric" {
@@ -429,3 +429,39 @@ testset "significance" {
         assert.is_true((MetricChange { metric: Metric.Exits, before: 3n, after: 1n }).significant())
     }
 }
+
+testset "ratio" {
+    test "kept in lowest terms so equality agrees with cmp" {
+        assert.equal(Ratio.new(6n, 4n), Ratio { numerator: 3n, denominator: 2n });
+        assert.equal(Ratio.new(0n, 7n), Ratio { numerator: 0n, denominator: 1n });
+        assert.is_true(Ratio.new(1n, 3n) < Ratio.new(1n, 2n))
+    }
+
+    test "rejects a denominator below one" {
+        let rejected = Ratio.new(1n, 0n) catch (e) {
+            baml.errors.InvalidArgument => null
+        };
+        assert.equal(rejected, null)
+    }
+
+    test "percent rounds half up" {
+        assert.equal(Ratio.new(1n, 8n).percent(), 13n);
+        assert.equal(Ratio.new(7n, 2n).percent(), 350n)
+    }
+}
+
+testset "context" {
+    test "new trims trailing slashes and normalizes the prefix" {
+        let ctx = Context.new(
+            "https://github.com//",
+            "acme/app",
+            "a41c9e2",
+            "canary",
+            "services\\agent\\",
+            ".",
+        );
+        assert.equal(ctx.server_url, "https://github.com");
+        assert.equal(ctx.project_prefix, "services/agent/")
+    }
+}
+

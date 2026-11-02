@@ -31,15 +31,16 @@ const EXPLANATIONS = ````
     }
     ```
 
-    Cognitive 1, with the branching moved into `cap`:
+    Cognitive 0, with the branching moved into `cap` and the loop into `reduce`:
 
     ```baml
     function capped_total(scores: int[]) -> int {
-        let total = 0;
-        for (let s in scores) {        // +1
-            total += cap(s);
-        }
-        total
+        scores.reduce(
+            (total, s) -> {
+                total + cap(s)
+            },
+            0,
+        )
     }
     ```
 

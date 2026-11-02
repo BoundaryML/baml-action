@@ -1,9 +1,6 @@
+// Deliberately wrong: ignores `high`, so the test below fails.
 function clamp(value: int, low: int, high: int) -> int {
-    if (value < low) {
-        low
-    } else {
-        value
-    }
+    value.max(low)
 }
 
 test "clamp caps at high" {
