@@ -34,7 +34,7 @@ inputs:
     required: false
     default: "true"
   comment:
-    description: On pull requests, post or update a comment comparing `baml codequality` against the base branch.
+    description: On pull requests, post a code health summary.
     required: false
     default: "true"
   github-token:

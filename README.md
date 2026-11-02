@@ -50,7 +50,7 @@ jobs:
 | `test` | `true` | Run `baml test`. A project with no tests passes with a notice. |
 | `test-profile` | | Test profile from `baml.toml`, passed as `baml test --profile`. |
 | `codequality` | `true` | Run `baml codequality`. |
-| `comment` | `true` | On pull requests, post a code quality comment. |
+| `comment` | `true` | On pull requests, post a code health summary. |
 | `github-token` | `github.token` | Token for the comment. Needs `pull-requests: write`. |
 
 ## Outputs
@@ -59,9 +59,9 @@ jobs:
 | --- | --- |
 | `version` | Resolved concrete BAML toolchain version |
 
-## Code quality comment
+## Code health comment
 
-On pull requests, the action measures the project at the pull request's base commit and at the checked-out commit, and comments with the functions whose cognitive complexity, cyclomatic complexity, NPath, nesting depth, or exit count went up or down, plus any new functions. The comment is updated in place on each push. It is only posted once something changed, and is updated to say so if a later push undoes the change.
+On pull requests, the action comments with a code health summary comparing the pull request to its base. The comment updates in place on each push.
 
 Both commits are measured with the same toolchain, so a toolchain upgrade does not show up as a code change.
 
