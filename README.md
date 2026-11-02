@@ -81,11 +81,3 @@ steps:
     with:
       project: ${{ matrix.project }}
 ```
-
-## Pinning
-
-The action pins `setup-baml` to a full commit SHA. For the same reproducibility in your workflow, pin this action to a commit SHA and let Dependabot or Renovate propose updates:
-
-```yaml
-- uses: BoundaryML/baml-action@0123456789abcdef0123456789abcdef01234567 # replace with a reviewed commit
-```
