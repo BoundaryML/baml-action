@@ -81,3 +81,7 @@ steps:
     with:
       project: ${{ matrix.project }}
 ```
+
+## Contributing
+
+This repository is a read-only mirror. Open changes against [`packaging/github-actions/baml-action`](https://github.com/BoundaryML/baml/tree/canary/packaging/github-actions/baml-action) in `BoundaryML/baml`.
